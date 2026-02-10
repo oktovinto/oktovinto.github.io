@@ -1,11 +1,11 @@
-// Import Supabase client
-import { supabase } from './supabase.js';
+// Local Storage Key
+const STORAGE_KEY = 'serverMonitoringData';
 
 // Chart instance
 let monitoringChart = null;
 
 // Initialize App
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', function() {
     // Set default datetime to now
     setDefaultDateTime();
     
@@ -13,17 +13,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     updateDateTime();
     setInterval(updateDateTime, 1000);
     
-    // Load data from Supabase
-    await loadData();
+    // Load data from localStorage
+    loadData();
     
     // Setup form submit
     document.getElementById('monitoringForm').addEventListener('submit', handleSubmit);
     
     // Initialize chart
     initChart();
-    
-    // Setup real-time subscription (optional)
-    setupRealtime();
 });
 
 // Update datetime display
@@ -55,24 +52,25 @@ function setDefaultDateTime() {
 }
 
 // Handle form submit
-async function handleSubmit(e) {
+function handleSubmit(e) {
     e.preventDefault();
     
     const formData = {
+        id: Date.now(),
         tanggal: document.getElementById('tanggal').value,
-        petugas: document.getElementById('petugas').value.trim(),
-        suhu: parseFloat(document.getElementById('suhu').value),
-        kelembaban: parseFloat(document.getElementById('kelembaban').value),
-        status_ac: document.getElementById('statusAC').value,
-        status_ups: document.getElementById('statusUPS').value,
-        status_listrik: document.getElementById('statusListrik').value,
-        status_server: document.getElementById('statusServer').value,
-        catatan: document.getElementById('catatan').value.trim()
+        petugas: document.getElementById('petugas').value,
+        suhu: document.getElementById('suhu').value,
+        kelembaban: document.getElementById('kelembaban').value,
+        statusAC: document.getElementById('statusAC').value,
+        statusUPS: document.getElementById('statusUPS').value,
+        statusListrik: document.getElementById('statusListrik').value,
+        statusServer: document.getElementById('statusServer').value,
+        catatan: document.getElementById('catatan').value
     };
     
     // Validate suhu and kelembaban
-    const suhu = formData.suhu;
-    const kelembaban = formData.kelembaban;
+    const suhu = parseFloat(formData.suhu);
+    const kelembaban = parseFloat(formData.kelembaban);
     
     if (suhu < 15 || suhu > 30) {
         showToast('⚠️ Peringatan: Suhu di luar rentang normal (20-25°C)', 'error');
@@ -82,58 +80,39 @@ async function handleSubmit(e) {
         showToast('⚠️ Peringatan: Kelembaban di luar rentang normal (40-60%)', 'error');
     }
     
-    try {
-        // Save data to Supabase
-        await saveData(formData);
-        
-        // Reset form
-        document.getElementById('monitoringForm').reset();
-        setDefaultDateTime();
-        
-        // Show success message
-        showToast('✅ Data berhasil disimpan!', 'success');
-        
-        // Reload data
-        await loadData();
-    } catch (error) {
-        console.error('Error saving data:', error);
-        showToast('❌ Gagal menyimpan data', 'error');
-    }
-}
-
-// Save data to Supabase
-async function saveData(data) {
-    const { error } = await supabase
-        .from('server_monitoring')
-        .insert([data]);
+    // Save data
+    saveData(formData);
     
-    if (error) throw error;
+    // Reset form
+    document.getElementById('monitoringForm').reset();
+    setDefaultDateTime();
+    
+    // Show success message
+    showToast('✅ Data berhasil disimpan!', 'success');
 }
 
-// Load data from Supabase
-async function loadData() {
-    try {
-        const { data, error } = await supabase
-            .from('server_monitoring')
-            .select('*')
-            .order('created_at', { ascending: false });
-        
-        if (error) throw error;
-        
-        // Update table
-        updateTable(data || []);
-        
-        // Update status display with latest data
-        if (data && data.length > 0) {
-            updateStatus(data[0]);
-        }
-        
-        // Update chart
-        updateChart(data || []);
-    } catch (error) {
-        console.error('Error loading data:', error);
-        showToast('❌ Gagal memuat data', 'error');
+// Save data to localStorage
+function saveData(data) {
+    let allData = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    allData.unshift(data); // Add to beginning
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(allData));
+    loadData();
+}
+
+// Load data from localStorage
+function loadData() {
+    const allData = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    
+    // Update table
+    updateTable(allData);
+    
+    // Update status display with latest data
+    if (allData.length > 0) {
+        updateStatus(allData[0]);
     }
+    
+    // Update chart
+    updateChart(allData);
 }
 
 // Initialize Chart
@@ -240,8 +219,8 @@ function initChart() {
 function updateChart(allData) {
     if (!monitoringChart) return;
     
-    // Get last 10 entries
-    const chartData = allData.slice(0, 10);
+    // Get last 10 entries (without reversing)
+    const chartData = allData.slice(0, 10); // Hapus .reverse()
     
     const labels = chartData.map(item => {
         const date = new Date(item.tanggal);
@@ -270,10 +249,10 @@ function updateStatus(data) {
     // Update values
     document.getElementById('currentSuhu').textContent = `${suhu}°C`;
     document.getElementById('currentKelembaban').textContent = `${kelembaban}%`;
-    document.getElementById('currentAC').textContent = data.status_ac;
-    document.getElementById('currentUPS').textContent = data.status_ups;
-    document.getElementById('currentListrik').textContent = data.status_listrik;
-    document.getElementById('currentServer').textContent = data.status_server;
+    document.getElementById('currentAC').textContent = data.statusAC;
+    document.getElementById('currentUPS').textContent = data.statusUPS;
+    document.getElementById('currentListrik').textContent = data.statusListrik;
+    document.getElementById('currentServer').textContent = data.statusServer;
     
     // Apply color classes
     const suhuElement = document.getElementById('currentSuhu');
@@ -296,9 +275,9 @@ function updateStatus(data) {
     
     // Status AC
     const acElement = document.getElementById('currentAC');
-    if (data.status_ac === 'Normal') {
+    if (data.statusAC === 'Normal') {
         acElement.className = 'status-value normal';
-    } else if (data.status_ac === 'Bermasalah') {
+    } else if (data.statusAC === 'Bermasalah') {
         acElement.className = 'status-value warning';
     } else {
         acElement.className = 'status-value danger';
@@ -306,9 +285,9 @@ function updateStatus(data) {
     
     // Status UPS
     const upsElement = document.getElementById('currentUPS');
-    if (data.status_ups === 'Normal') {
+    if (data.statusUPS === 'Normal') {
         upsElement.className = 'status-value normal';
-    } else if (data.status_ups === 'Bermasalah') {
+    } else if (data.statusUPS === 'Bermasalah') {
         upsElement.className = 'status-value warning';
     } else {
         upsElement.className = 'status-value danger';
@@ -316,7 +295,7 @@ function updateStatus(data) {
     
     // Status Listrik
     const listrikElement = document.getElementById('currentListrik');
-    if (data.status_listrik === 'Normal') {
+    if (data.statusListrik === 'Normal') {
         listrikElement.className = 'status-value normal';
     } else {
         listrikElement.className = 'status-value danger';
@@ -324,9 +303,9 @@ function updateStatus(data) {
     
     // Status Server
     const serverElement = document.getElementById('currentServer');
-    if (data.status_server === 'Online') {
+    if (data.statusServer === 'Online') {
         serverElement.className = 'status-value normal';
-    } else if (data.status_server === 'Maintenance') {
+    } else if (data.statusServer === 'Maintenance') {
         serverElement.className = 'status-value warning';
     } else {
         serverElement.className = 'status-value danger';
@@ -360,10 +339,10 @@ function updateTable(data) {
                 <td>${item.petugas}</td>
                 <td>${item.suhu}°C</td>
                 <td>${item.kelembaban}%</td>
-                <td><span class="status-badge badge-${item.status_ac.toLowerCase()}">${item.status_ac}</span></td>
-                <td><span class="status-badge badge-${item.status_ups.toLowerCase()}">${item.status_ups}</span></td>
-                <td><span class="status-badge badge-${item.status_listrik.toLowerCase()}">${item.status_listrik}</span></td>
-                <td><span class="status-badge badge-${item.status_server.toLowerCase()}">${item.status_server}</span></td>
+                <td><span class="status-badge badge-${item.statusAC.toLowerCase()}">${item.statusAC}</span></td>
+                <td><span class="status-badge badge-${item.statusUPS.toLowerCase()}">${item.statusUPS}</span></td>
+                <td><span class="status-badge badge-${item.statusListrik.toLowerCase()}">${item.statusListrik}</span></td>
+                <td><span class="status-badge badge-${item.statusServer.toLowerCase()}">${item.statusServer}</span></td>
                 <td>${item.catatan || '-'}</td>
                 <td>
                     <button class="btn btn-delete" onclick="deleteData(${item.id})">🗑️ Hapus</button>
@@ -376,162 +355,118 @@ function updateTable(data) {
 }
 
 // Delete single data
-async function deleteData(id) {
+function deleteData(id) {
     if (confirm('Apakah Anda yakin ingin menghapus data ini?')) {
-        try {
-            const { error } = await supabase
-                .from('server_monitoring')
-                .delete()
-                .eq('id', id);
-            
-            if (error) throw error;
-            
-            await loadData();
-            showToast('🗑️ Data berhasil dihapus!', 'success');
-        } catch (error) {
-            console.error('Error deleting data:', error);
-            showToast('❌ Gagal menghapus data', 'error');
-        }
+        let allData = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        allData = allData.filter(item => item.id !== id);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(allData));
+        loadData();
+        showToast('🗑️ Data berhasil dihapus!', 'success');
     }
 }
 
 // Clear all data
-async function clearAllData() {
+function clearAllData() {
     if (confirm('⚠️ PERINGATAN: Apakah Anda yakin ingin menghapus SEMUA data monitoring? Tindakan ini tidak dapat dibatalkan!')) {
         if (confirm('Konfirmasi sekali lagi: Hapus semua data?')) {
-            try {
-                const { error } = await supabase
-                    .from('server_monitoring')
-                    .delete()
-                    .gte('id', 0); // Delete all rows
-                
-                if (error) throw error;
-                
-                await loadData();
-                showToast('🗑️ Semua data berhasil dihapus!', 'success');
-            } catch (error) {
-                console.error('Error clearing all data:', error);
-                showToast('❌ Gagal menghapus semua data', 'error');
-            }
+            localStorage.removeItem(STORAGE_KEY);
+            loadData();
+            showToast('🗑️ Semua data berhasil dihapus!', 'success');
         }
     }
 }
 
 // Export to Excel (using SheetJS)
-async function exportToExcel() {
-    try {
-        const { data, error } = await supabase
-            .from('server_monitoring')
-            .select('*')
-            .order('created_at', { ascending: false });
-        
-        if (error) throw error;
-        
-        if (!data || data.length === 0) {
-            showToast('⚠️ Tidak ada data untuk diekspor!', 'error');
-            return;
-        }
-        
-        // Prepare data for Excel
-        const excelData = [];
-        
-        // Add title rows
-        excelData.push(['LAPORAN MONITORING RUANG SERVER']);
-        excelData.push(['Tanggal Export: ' + new Date().toLocaleString('id-ID')]);
-        excelData.push([]); // Empty row
-        
-        // Add headers
-        excelData.push([
-            'No',
-            'Tanggal & Waktu',
-            'Petugas',
-            'Suhu (°C)',
-            'Kelembaban (%)',
-            'Status AC',
-            'Status UPS',
-            'Status Listrik',
-            'Status Server',
-            'Catatan'
-        ]);
-        
-        // Add data rows
-        data.forEach((item, index) => {
-            const date = new Date(item.tanggal);
-            const formattedDate = date.toLocaleString('id-ID');
-            
-            excelData.push([
-                index + 1,
-                formattedDate,
-                item.petugas,
-                parseFloat(item.suhu),
-                parseFloat(item.kelembaban),
-                item.status_ac,
-                item.status_ups,
-                item.status_listrik,
-                item.status_server,
-                item.catatan || '-'
-            ]);
-        });
-        
-        // Create worksheet
-        const ws = XLSX.utils.aoa_to_sheet(excelData);
-        
-        // Set column widths
-        ws['!cols'] = [
-            { wch: 5 },  // No
-            { wch: 20 }, // Tanggal
-            { wch: 20 }, // Petugas
-            { wch: 12 }, // Suhu
-            { wch: 15 }, // Kelembaban
-            { wch: 15 }, // AC
-            { wch: 15 }, // UPS
-            { wch: 15 }, // Listrik
-            { wch: 15 }, // Server
-            { wch: 30 }  // Catatan
-        ];
-        
-        // Style the title
-        ws['A1'].s = {
-            font: { bold: true, sz: 14 },
-            alignment: { horizontal: 'center' }
-        };
-        
-        // Merge title cell
-        ws['!merges'] = [
-            { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }, // Merge A1:J1
-            { s: { r: 1, c: 0 }, e: { r: 1, c: 9 } }  // Merge A2:J2
-        ];
-        
-        // Create workbook
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Monitoring Server');
-        
-        // Generate filename
-        const now = new Date();
-        const filename = `Monitoring_Server_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.xlsx`;
-        
-        // Save file
-        XLSX.writeFile(wb, filename);
-        
-        showToast('📥 Data berhasil diekspor ke Excel!', 'success');
-    } catch (error) {
-        console.error('Error exporting to Excel:', error);
-        showToast('❌ Gagal mengekspor data', 'error');
+function exportToExcel() {
+    const allData = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    
+    if (allData.length === 0) {
+        showToast('⚠️ Tidak ada data untuk diekspor!', 'error');
+        return;
     }
-}
-
-// Setup real-time updates (optional)
-function setupRealtime() {
-    supabase
-        .channel('server-monitoring-changes')
-        .on('postgres_changes', 
-            { event: '*', schema: 'public', table: 'server_monitoring' }, 
-            async (payload) => {
-                console.log('Data changed:', payload);
-                await loadData();
-            }
-        )
-        .subscribe();
+    
+    // Prepare data for Excel
+    const excelData = [];
+    
+    // Add title rows
+    excelData.push(['LAPORAN MONITORING RUANG SERVER']);
+    excelData.push(['Tanggal Export: ' + new Date().toLocaleString('id-ID')]);
+    excelData.push([]); // Empty row
+    
+    // Add headers
+    excelData.push([
+        'No',
+        'Tanggal & Waktu',
+        'Petugas',
+        'Suhu (°C)',
+        'Kelembaban (%)',
+        'Status AC',
+        'Status UPS',
+        'Status Listrik',
+        'Status Server',
+        'Catatan'
+    ]);
+    
+    // Add data rows
+    allData.forEach((item, index) => {
+        const date = new Date(item.tanggal);
+        const formattedDate = date.toLocaleString('id-ID');
+        
+        excelData.push([
+            index + 1,
+            formattedDate,
+            item.petugas,
+            parseFloat(item.suhu),
+            parseFloat(item.kelembaban),
+            item.statusAC,
+            item.statusUPS,
+            item.statusListrik,
+            item.statusServer,
+            item.catatan || '-'
+        ]);
+    });
+    
+    // Create worksheet
+    const ws = XLSX.utils.aoa_to_sheet(excelData);
+    
+    // Set column widths
+    ws['!cols'] = [
+        { wch: 5 },  // No
+        { wch: 20 }, // Tanggal
+        { wch: 20 }, // Petugas
+        { wch: 12 }, // Suhu
+        { wch: 15 }, // Kelembaban
+        { wch: 15 }, // AC
+        { wch: 15 }, // UPS
+        { wch: 15 }, // Listrik
+        { wch: 15 }, // Server
+        { wch: 30 }  // Catatan
+    ];
+    
+    // Style the title
+    ws['A1'].s = {
+        font: { bold: true, sz: 14 },
+        alignment: { horizontal: 'center' }
+    };
+    
+    // Merge title cell
+    ws['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }, // Merge A1:J1
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 9 } }  // Merge A2:J2
+    ];
+    
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Monitoring Server');
+    
+    // Generate filename
+    const now = new Date();
+    const filename = `Monitoring_Server_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.xlsx`;
+    
+    // Save file
+    XLSX.writeFile(wb, filename);
+    
+    showToast('📥 Data berhasil diekspor ke Excel!', 'success');
 }
 
 // Show toast notification
