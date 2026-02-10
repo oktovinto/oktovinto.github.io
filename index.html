@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoring Ruang Server</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Sistem Monitoring Ruang Server</h1>
+            <div class="datetime" id="datetime"></div>
+        </header>
+
+        <main>
+            <!-- Form Input Data -->
+            <section class="card">
+                <h2>Input Data Monitoring</h2>
+                <form id="monitoringForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="tanggal">Tanggal & Waktu</label>
+                            <input type="datetime-local" id="tanggal" name="tanggal" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="petugas">Nama Petugas</label>
+                            <input type="text" id="petugas" name="petugas" placeholder="Masukkan nama petugas" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="suhu">Suhu (°C)</label>
+                            <input type="number" id="suhu" name="suhu" step="0.1" placeholder="20-25°C" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="kelembaban">Kelembaban (%)</label>
+                            <input type="number" id="kelembaban" name="kelembaban" step="0.1" placeholder="40-60%" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="statusAC">Status AC</label>
+                            <select id="statusAC" name="statusAC" required>
+                                <option value="">Pilih Status</option>
+                                <option value="Normal">Normal</option>
+                                <option value="Bermasalah">Bermasalah</option>
+                                <option value="Mati">Mati</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="statusUPS">Status UPS</label>
+                            <select id="statusUPS" name="statusUPS" required>
+                                <option value="">Pilih Status</option>
+                                <option value="Normal">Normal</option>
+                                <option value="Bermasalah">Bermasalah</option>
+                                <option value="Mati">Mati</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="statusListrik">Status Listrik</label>
+                            <select id="statusListrik" name="statusListrik" required>
+                                <option value="">Pilih Status</option>
+                                <option value="Normal">Normal</option>
+                                <option value="Gangguan">Gangguan</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="statusServer">Status Server</label>
+                            <select id="statusServer" name="statusServer" required>
+                                <option value="">Pilih Status</option>
+                                <option value="Online">Online</option>
+                                <option value="Offline">Offline</option>
+                                <option value="Maintenance">Maintenance</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="catatan">Catatan/Keterangan</label>
+                        <textarea id="catatan" name="catatan" rows="3" placeholder="Masukkan catatan jika ada..."></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <span>💾</span> Simpan Data
+                        </button>
+                        <button type="reset" class="btn btn-secondary">
+                            <span>🔄</span> Reset Form
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Status Terkini -->
+            <section class="card">
+                <h2>Status Terkini</h2>
+                <div class="status-grid" id="statusGrid">
+                    <div class="status-item">
+                        <div class="status-icon">🌡️</div>
+                        <div class="status-label">Suhu</div>
+                        <div class="status-value" id="currentSuhu">--°C</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">💧</div>
+                        <div class="status-label">Kelembaban</div>
+                        <div class="status-value" id="currentKelembaban">--%</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">❄️</div>
+                        <div class="status-label">AC</div>
+                        <div class="status-value" id="currentAC">--</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">🔋</div>
+                        <div class="status-label">UPS</div>
+                        <div class="status-value" id="currentUPS">--</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">⚡</div>
+                        <div class="status-label">Listrik</div>
+                        <div class="status-value" id="currentListrik">--</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">💻</div>
+                        <div class="status-label">Server</div>
+                        <div class="status-value" id="currentServer">--</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Grafik Monitoring -->
+            <section class="card">
+                <h2>📈 Grafik Monitoring Suhu & Kelembaban</h2>
+                <div class="chart-container">
+                    <canvas id="monitoringChart"></canvas>
+                </div>
+                <div class="chart-info">
+                    <p>📊 Grafik menampilkan 10 data monitoring terakhir</p>
+                </div>
+            </section>
+
+            <!-- Tabel Riwayat -->
+            <section class="card">
+                <div class="table-header">
+                    <h2>Riwayat Monitoring</h2>
+                    <div class="table-actions">
+                        <button class="btn btn-small btn-success" onclick="exportToExcel()">
+                            📥 Export Excel
+                        </button>
+                        <button class="btn btn-small btn-danger" onclick="clearAllData()">
+                            🗑️ Hapus Semua
+                        </button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table id="monitoringTable">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Tanggal & Waktu</th>
+                                <th>Petugas</th>
+                                <th>Suhu</th>
+                                <th>Kelembaban</th>
+                                <th>AC</th>
+                                <th>UPS</th>
+                                <th>Listrik</th>
+                                <th>Server</th>
+                                <th>Catatan</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr>
+                                <td colspan="11" class="empty-state">Belum ada data monitoring</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 Sistem Monitoring Ruang Server. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
