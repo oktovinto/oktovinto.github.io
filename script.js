@@ -469,6 +469,147 @@ function exportToExcel() {
     showToast('📥 Data berhasil diekspor ke Excel!', 'success');
 }
 
+// Export to PDF (using jsPDF)
+async function exportToPDF() {
+    const allData = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    
+    if (allData.length === 0) {
+        showToast('⚠️ Tidak ada data untuk diekspor!', 'error');
+        return;
+    }
+    
+    // Create new PDF document
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
+    
+    // PDF configuration
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    const contentWidth = pageWidth - (margin * 2);
+    let yPos = 20;
+    
+    // Add title
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('LAPORAN MONITORING RUANG SERVER', pageWidth / 2, yPos, { align: 'center' });
+    
+    yPos += 8;
+    
+    // Add export date
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Tanggal Export: ' + new Date().toLocaleString('id-ID'), pageWidth / 2, yPos, { align: 'center' });
+    
+    yPos += 10;
+    
+    // Table headers
+    const headers = ['No', 'Tanggal', 'Petugas', 'Suhu', 'Kelembaban', 'AC', 'UPS', 'Listrik', 'Server'];
+    const colWidths = [10, 30, 35, 15, 15, 20, 20, 20, 20]; // Total: 185mm
+    
+    // Draw table header
+    doc.setFillColor(37, 99, 235); // Primary color
+    doc.rect(margin, yPos, contentWidth, 8, 'F');
+    
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    
+    let xPos = margin + 2;
+    headers.forEach((header, index) => {
+        doc.text(header, xPos, yPos + 5.5);
+        xPos += colWidths[index];
+    });
+    
+    yPos += 8;
+    
+    // Draw table rows
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
+    
+    allData.forEach((item, index) => {
+        // Check if we need a new page
+        if (yPos > 270) {
+            doc.addPage();
+            yPos = 20;
+        }
+        
+        // Alternate row color
+        if (index % 2 === 0) {
+            doc.setFillColor(248, 250, 252);
+            doc.rect(margin, yPos, contentWidth, 6, 'F');
+        }
+        
+        xPos = margin + 2;
+        
+        // Format date
+        const date = new Date(item.tanggal);
+        const formattedDate = date.toLocaleString('id-ID', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        // Get status (truncate if too long)
+        const statusAC = item.statusAC.length > 12 ? item.statusAC.substring(0, 10) + '..' : item.statusAC;
+        const statusUPS = item.statusUPS.length > 12 ? item.statusUPS.substring(0, 10) + '..' : item.statusUPS;
+        const statusListrik = item.statusListrik.length > 12 ? item.statusListrik.substring(0, 10) + '..' : item.statusListrik;
+        const statusServer = item.statusServer.length > 12 ? item.statusServer.substring(0, 10) + '..' : item.statusServer;
+        
+        doc.setFontSize(7);
+        
+        // Add data
+        doc.text(String(index + 1), xPos, yPos + 4);
+        xPos += colWidths[0];
+        
+        doc.text(formattedDate, xPos, yPos + 4);
+        xPos += colWidths[1];
+        
+        doc.text(item.petugas.substring(0, 20), xPos, yPos + 4);
+        xPos += colWidths[2];
+        
+        doc.text(item.suhu + '°C', xPos, yPos + 4);
+        xPos += colWidths[3];
+        
+        doc.text(item.kelembaban + '%', xPos, yPos + 4);
+        xPos += colWidths[4];
+        
+        doc.text(statusAC, xPos, yPos + 4);
+        xPos += colWidths[5];
+        
+        doc.text(statusUPS, xPos, yPos + 4);
+        xPos += colWidths[6];
+        
+        doc.text(statusListrik, xPos, yPos + 4);
+        xPos += colWidths[7];
+        
+        doc.text(statusServer, xPos, yPos + 4);
+        
+        yPos += 6;
+    });
+    
+    // Add footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(128, 128, 128);
+        doc.text(`Halaman ${i} dari ${pageCount}`, pageWidth / 2, 290, { align: 'center' });
+        doc.text('Sistem Monitoring Ruang Server', pageWidth / 2, 295, { align: 'center' });
+    }
+    
+    // Generate filename
+    const now = new Date();
+    const filename = `Monitoring_Server_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.pdf`;
+    
+    // Save PDF
+    doc.save(filename);
+    
+    showToast('📄 Data berhasil diekspor ke PDF!', 'success');
+}
+
 // Show toast notification
 function showToast(message, type = 'success') {
     const toast = document.getElementById('toast');
